@@ -3,10 +3,10 @@ using UnityEngine;
 
 public class GridGeneratorWindow : EditorWindow
 {
+    #region Fields
+
     private Cell _cell;
-    private GameObject _draggedPrefab;
-    private bool _isDragging = false;
-    private Vector2Int _lastPosition;
+    private GameObject _currentObject;
     private int _rotationStep = 0;
     private float _cellSize = 1;
     private Vector2Int _gridSize = new(10, 10);
@@ -15,6 +15,7 @@ public class GridGeneratorWindow : EditorWindow
     private const string GRID_GAMEOBJECT_NAME = "Cells Storage";
     private readonly Vector3 GRID_START = Vector3.zero;
 
+    #endregion
 
     [MenuItem("Tools/Open Grid Generator Window")]
     public static void ShowWindow()
@@ -22,15 +23,9 @@ public class GridGeneratorWindow : EditorWindow
         GetWindow<GridGeneratorWindow>("Grid Generator");
     }
 
-    private void OnEnable()
-    {
-        SceneView.duringSceneGui += OnSceneGUI;
-    }
+    private void OnEnable() => SceneView.duringSceneGui += OnSceneGUI;
 
-    private void OnDisable()
-    {
-        SceneView.duringSceneGui -= OnSceneGUI;
-    }
+    private void OnDisable() => SceneView.duringSceneGui -= OnSceneGUI;
 
     private void OnGUI()
     {
@@ -51,33 +46,47 @@ public class GridGeneratorWindow : EditorWindow
 
         DrawGrid();
 
-        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.R && Event.current.control)
+        switch (Event.current.type)
         {
-            Debug.Log("Rotate object!");
-            _rotationStep = (_rotationStep + 1) % 4;
-            SceneView.RepaintAll();
-            Event.current.Use();
-        }
+            case EventType.DragUpdated:
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                if (_currentObject == null)
+                {
+                    GameObject draggedObject = DragAndDrop.objectReferences[0] as GameObject;
+                    _currentObject = PrefabUtility.InstantiatePrefab(draggedObject) as GameObject;
+                }
+                HandleDrag();
+                Event.current.Use();
+                break;
 
-        if (_isDragging && _draggedPrefab != null && _lastPosition != -Vector2Int.one)
-        {
-            DrawGhostObject(_lastPosition, _rotationStep);
-        }
+            case EventType.DragPerform:
+                DragAndDrop.AcceptDrag();
+                _currentObject = null;
+                SceneView.RepaintAll();
+                Event.current.Use();
+                break;
 
-        if (Event.current.type == EventType.DragUpdated || Event.current.type == EventType.DragPerform)
-        {
-            HandleProjectWindowDrag();
-        }
+            case EventType.MouseDown:
+                if (Event.current.button == 0)
+                {
+                    HandleClick();
+                    Event.current.Use();
+                }
+                break;
 
-        if (Event.current.type == EventType.DragExited)
-        {
-            EndDrag();
+            case EventType.KeyDown:
+                if (Event.current.keyCode == KeyCode.R && Event.current.control)
+                {
+                    Debug.Log("Rotate");
+                    Event.current.Use();
+                }
+                break;
         }
     }
 
     private void HandleDrag()
     {
-        if (_draggedPrefab == null) return;
+        if (_currentObject == null) return;
 
         Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
         Plane plane = new(Vector3.up, GRID_START.y);
@@ -86,10 +95,19 @@ public class GridGeneratorWindow : EditorWindow
             Vector3 hitPoint = ray.GetPoint(distance);
             Vector2Int cellCoordinate = WorldToGridCoordinate(hitPoint);
 
-            if (cellCoordinate != _lastPosition)
-            {
-                _lastPosition = cellCoordinate;
-            }
+            _currentObject.transform.position = new Vector3(
+                cellCoordinate.x * _cellSize + _cellSize / 2f,
+                GRID_START.y,
+                cellCoordinate.y * _cellSize + _cellSize / 2f);
+        }
+    }
+
+    private void HandleClick()
+    {
+        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit))
+        {
+            Debug.Log("GameObject: " + hit.collider.gameObject.name);
         }
     }
 
@@ -104,53 +122,6 @@ public class GridGeneratorWindow : EditorWindow
         return new Vector2Int(x, y);
     }
 
-    private void EndDrag()
-    {
-        if (_isDragging && _draggedPrefab != null && _lastPosition != -Vector2Int.one)
-        {
-            InstantiateObject(_lastPosition);
-        }
-
-        _isDragging = false;
-        _draggedPrefab = null;
-        _lastPosition = -Vector2Int.one;
-        _rotationStep = 0;
-
-        SceneView.RepaintAll();
-    }
-
-    private void HandleProjectWindowDrag()
-    {
-        if (DragAndDrop.objectReferences.Length == 0 || !(DragAndDrop.objectReferences[0] is GameObject))
-            return;
-
-        GameObject draggedObject = DragAndDrop.objectReferences[0] as GameObject;
-
-        if (PrefabUtility.GetPrefabAssetType(draggedObject) == PrefabAssetType.NotAPrefab)
-            return;
-
-        switch (Event.current.type)
-        {
-            case EventType.DragUpdated:
-                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
-                if (!_isDragging)
-                {
-                    _isDragging = true;
-                    _draggedPrefab = draggedObject;
-                    _rotationStep = 0;
-                }
-                HandleDrag();
-                Event.current.Use();
-                break;
-
-            case EventType.DragPerform:
-                DragAndDrop.AcceptDrag();
-                EndDrag();
-                Event.current.Use();
-                break;
-        }
-    }
-
     private void InstantiateObject(Vector2Int cellCoordinate)
     {
         Vector3 worldPosition = new Vector3(
@@ -162,22 +133,14 @@ public class GridGeneratorWindow : EditorWindow
         float angle = _rotationStep * 90f;
         Quaternion rotation = Quaternion.Euler(0, angle, 0);
 
-        GameObject instance = PrefabUtility.InstantiatePrefab(_draggedPrefab) as GameObject;
+        GameObject instance = PrefabUtility.InstantiatePrefab(_currentObject) as GameObject;
         instance.transform.position = worldPosition;
         instance.transform.rotation = rotation;
 
         Debug.Log($"<color=green>Instantiate {instance.name} at cell {cellCoordinate} with rotation {angle}</color>");
     }
 
-    private void DrawGhostObject(Vector2Int cellCoordinate, int rotationSteps)
-    {
-        Vector3 worldPosition = new(cellCoordinate.x * _cellSize + _cellSize / 2, GRID_START.y + _cellSize / 2, cellCoordinate.y * _cellSize + _cellSize / 2);
-        Quaternion rotation = Quaternion.Euler(0, rotationSteps * ROTATION_STEP, 0);
-
-        Handles.color = Color.green;
-        Handles.DrawWireCube(worldPosition, _cellSize * Vector3.one);
-        UtilityShapesDrawer.DrawArrow(worldPosition + new Vector3(0, _cellSize / 2, 0), rotation, _cellSize, 0.4f, Color.magenta);
-    }
+    #region Grid Logic
 
     private void GenerateGrid()
     {
@@ -228,4 +191,6 @@ public class GridGeneratorWindow : EditorWindow
         for (int i = cellsStorage.transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(cellsStorage.transform.GetChild(i).gameObject);
     }
+
+    #endregion
 }
