@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 
@@ -6,13 +7,19 @@ public class GridGeneratorWindow : EditorWindow
     #region Fields
 
     private Cell _cell;
+    private CellStorage _cellStorage;
     private GameObject _currentObject;
-    private int _rotationStep = 0;
+    //private int _rotationStep = 0;
     private float _cellSize = 1;
     private Vector2Int _gridSize = new(10, 10);
+    private Vector2Int _lastPosition;
 
-    private const float ROTATION_STEP = 90;
+    private bool _drawGrid = false;
+    private bool _drawName = false;
+
+    //private const float ROTATION_STEP = 90;
     private const string GRID_GAMEOBJECT_NAME = "Cells Storage";
+    private const string GEOMETRY_GAMEOBJECT_NAME = "Geometry";
     private readonly Vector3 GRID_START = Vector3.zero;
 
     #endregion
@@ -32,9 +39,17 @@ public class GridGeneratorWindow : EditorWindow
         GUILayout.Label("Grid Generation Settings", EditorStyles.boldLabel);
 
         _cell = (Cell)EditorGUILayout.ObjectField("Cell Prefab", _cell, typeof(Cell), false);
+        _cellStorage = (CellStorage)EditorGUILayout.ObjectField("Cell Storage Object", _cellStorage, typeof(CellStorage), false);
 
         _gridSize = Vector2Int.RoundToInt(EditorGUILayout.Vector2Field("Grid Size", _gridSize));
         _cellSize = EditorGUILayout.FloatField("Cell Size", _cellSize);
+
+        _drawGrid = GUILayout.Toggle(_drawGrid, "Active Grid Draw");
+        _drawName = GUILayout.Toggle(_drawName, "Active Name Draw");
+
+        _cellStorage.GridSize = _gridSize;
+        _cellStorage.CellSize = _cellSize;
+        _cellStorage.GridStart = GRID_START;
 
         if (GUILayout.Button("Generate Grid")) GenerateGrid();
         if (GUILayout.Button("Destroy Grid")) ClearGrid();
@@ -42,6 +57,13 @@ public class GridGeneratorWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneView)
     {
+        GameObject geometryStorage = GameObject.Find(GEOMETRY_GAMEOBJECT_NAME);
+        if (!geometryStorage)
+        {
+            geometryStorage = new GameObject(GEOMETRY_GAMEOBJECT_NAME);
+            geometryStorage.transform.position = GRID_START;
+        }
+
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
         DrawGrid();
@@ -54,12 +76,17 @@ public class GridGeneratorWindow : EditorWindow
                 {
                     GameObject draggedObject = DragAndDrop.objectReferences[0] as GameObject;
                     _currentObject = PrefabUtility.InstantiatePrefab(draggedObject) as GameObject;
+                    _currentObject.gameObject.transform.SetParent(geometryStorage.transform);
                 }
                 HandleDrag();
                 Event.current.Use();
                 break;
 
             case EventType.DragPerform:
+                if (_currentObject.TryGetComponent<Resource>(out var resource))
+                {
+                    _cellStorage.SetCellStatus(_lastPosition, CellStatus.Resource);
+                }
                 DragAndDrop.AcceptDrag();
                 _currentObject = null;
                 SceneView.RepaintAll();
@@ -99,6 +126,8 @@ public class GridGeneratorWindow : EditorWindow
                 cellCoordinate.x * _cellSize + _cellSize / 2f,
                 GRID_START.y,
                 cellCoordinate.y * _cellSize + _cellSize / 2f);
+
+            _lastPosition = cellCoordinate;
         }
     }
 
@@ -122,24 +151,6 @@ public class GridGeneratorWindow : EditorWindow
         return new Vector2Int(x, y);
     }
 
-    private void InstantiateObject(Vector2Int cellCoordinate)
-    {
-        Vector3 worldPosition = new Vector3(
-            cellCoordinate.x * _cellSize + _cellSize / 2f,
-            GRID_START.y,
-            cellCoordinate.y * _cellSize + _cellSize / 2f
-        );
-
-        float angle = _rotationStep * 90f;
-        Quaternion rotation = Quaternion.Euler(0, angle, 0);
-
-        GameObject instance = PrefabUtility.InstantiatePrefab(_currentObject) as GameObject;
-        instance.transform.position = worldPosition;
-        instance.transform.rotation = rotation;
-
-        Debug.Log($"<color=green>Instantiate {instance.name} at cell {cellCoordinate} with rotation {angle}</color>");
-    }
-
     #region Grid Logic
 
     private void GenerateGrid()
@@ -161,7 +172,11 @@ public class GridGeneratorWindow : EditorWindow
                 Cell cell = cellObj.GetComponent<Cell>();
                 cell.gameObject.transform.SetParent(cellsStorage.transform);
                 cell.gameObject.transform.position = GRID_START + new Vector3(cell_x * _cellSize, 0, cell_z * _cellSize);
-                cell.Initialize(new Vector2Int(cell_x, cell_z));
+                Vector2Int position = new(cell_x, cell_z);
+                cell.Initialize(position);
+                cell.Position = position;
+
+                _cellStorage.Cells.Add(cell);
             }
         }
 
@@ -172,15 +187,22 @@ public class GridGeneratorWindow : EditorWindow
     {
         Color color = Color.cyan;
 
-        UtilityShapesDrawer.DrawGrid(GRID_START, _cellSize, _gridSize, color);
+        if (_drawGrid)
+        {
+            UtilityShapesDrawer.DrawGrid(GRID_START, _cellSize, _gridSize, color);
+        }
 
-        GUIStyle labelStyle = new GUIStyle()
+        GUIStyle labelStyle = new()
         {
             normal = { textColor = color },
             alignment = TextAnchor.MiddleCenter,
             fontSize = 12
         };
-        UtilityShapesDrawer.DrawGridLabels(GRID_START, _cellSize, _gridSize, string.Empty/*"Cell\n"*/, labelStyle);
+
+        if (_drawName)
+        {
+            UtilityShapesDrawer.DrawGridLabels(GRID_START, _cellSize, _gridSize, string.Empty/*"Cell\n"*/, labelStyle);
+        }
     }
 
     private void ClearGrid()
@@ -190,6 +212,8 @@ public class GridGeneratorWindow : EditorWindow
 
         for (int i = cellsStorage.transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(cellsStorage.transform.GetChild(i).gameObject);
+
+        _cellStorage.Cells.Clear();
     }
 
     #endregion
