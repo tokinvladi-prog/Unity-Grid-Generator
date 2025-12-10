@@ -1,6 +1,3 @@
-using System;
-using UnityEditor;
-using UnityEditor.Playables;
 using UnityEngine;
 using Zenject;
 
@@ -15,6 +12,8 @@ public class Cell : MonoBehaviour
 {
     public Vector2Int Position;
     public CellStatus Status = CellStatus.Empty;
+
+    private GameObject AttachedObject;
     private MobileInput _input;
     private BuildingPlacer _buildingPlacer;
 
@@ -43,24 +42,23 @@ public class Cell : MonoBehaviour
     }
 
 #if UNITY_EDITOR
-    private void OnDrawGizmos()
+    public void DrawGizmos()
     {
-        Color color = Color.red;
-        switch (Status)
-        {
-            case CellStatus.Empty:
-                color = Color.green;
-                break;
-            case CellStatus.Block:
-                color = Color.red;
-                break;
-            case CellStatus.Resource:
-                color = Color.blue;
-                break;
-        }
+        Color color = GetStatusColor(Status);
         color.a = 0.25f;
 
-        UtilityShapesDrawer.DrawSolidSquare(transform.position + new Vector3(transform.localScale.x / 2, 0, transform.localScale.z / 2), transform.localScale.x * 0.8f, Quaternion.identity, color);
+        UtilityShapesDrawer.DrawWireSquare(transform.position + new Vector3(transform.localScale.x / 2, 0, transform.localScale.z / 2), transform.localScale.x * 0.8f, Quaternion.identity, color);
+    }
+
+    private Color GetStatusColor(CellStatus status)
+    {
+        return status switch
+        {
+            CellStatus.Empty => Color.green,
+            CellStatus.Block => Color.red,
+            CellStatus.Resource => Color.blue,
+            _ => Color.black,
+        };
     }
 #endif
 }

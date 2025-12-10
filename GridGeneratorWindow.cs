@@ -15,6 +15,7 @@ public class GridGeneratorWindow : EditorWindow
     private bool _drawGrid = false;
     private bool _drawLabel = false;
 
+
     private const string GRID_GAMEOBJECT_NAME = "Cells Storage";
     private readonly Vector3 GRID_START = Vector3.zero;
 
@@ -41,9 +42,12 @@ public class GridGeneratorWindow : EditorWindow
 
         _drawGrid = GUILayout.Toggle(_drawGrid, "Active Grid Draw");
         _drawLabel = GUILayout.Toggle(_drawLabel, "Active Name Draw");
+        CellStorage.Instance.VisualizeCellsStatus = GUILayout.Toggle(CellStorage.Instance.VisualizeCellsStatus, "Active Status");
 
-        if (GUILayout.Button("Generate Grid")) GenerateGrid();
-        if (GUILayout.Button("Destroy Grid")) ClearGrid(_container);
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Generate Grid", GUILayout.Width(100))) GenerateGrid();
+        if (GUILayout.Button("Destroy Grid", GUILayout.Width(100))) ClearGrid(_container);
+        GUILayout.EndHorizontal();
     }
 
     private void OnSceneGUI(SceneView sceneView)
@@ -63,6 +67,10 @@ public class GridGeneratorWindow : EditorWindow
                 CreateCell(x, y, _container);
 
         Debug.Log($"<color=cyan>Generate grid with {_gridSize.x * _gridSize.y} cells</color>");
+
+        CellStorage.Instance.GridSize = _gridSize;
+        CellStorage.Instance.CellSize = _cellSize;
+        CellStorage.Instance.GridStart = GRID_START;
     }
 
     private Transform GetGridContainer()
@@ -90,11 +98,16 @@ public class GridGeneratorWindow : EditorWindow
 
             cell.gameObject.transform.position = GRID_START + new Vector3(x * _cellSize, 0, y * _cellSize);
             cell.Initialize(position);
+
+            CellStorage.Instance.Cells.Add(cell);
         }
     }
 
     private void ClearGrid(Transform container)
-        => container.Cast<Transform>().ToList().ForEach(c => DestroyImmediate(c.gameObject));
+    {
+        container.Cast<Transform>().ToList().ForEach(c => DestroyImmediate(c.gameObject));
+        CellStorage.Instance.Cells.Clear();
+    }
 
     #endregion
 
