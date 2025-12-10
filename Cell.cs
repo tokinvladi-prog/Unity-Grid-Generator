@@ -12,8 +12,9 @@ public class Cell : MonoBehaviour
 {
     public Vector2Int Position;
     public CellStatus Status = CellStatus.Empty;
+    public GameObject AttachedObject;
 
-    private GameObject AttachedObject;
+
     private MobileInput _input;
     private BuildingPlacer _buildingPlacer;
 

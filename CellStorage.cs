@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
 
 [ExecuteAlways]
@@ -46,17 +45,18 @@ public class CellStorage : MonoBehaviour
     public Cell GetCell(Vector2Int position)
         => Cells.FirstOrDefault(c => c.Position.Equals(position));
 
+    public Cell GetCell(GameObject attachedObject)
+        => Cells.FirstOrDefault(c => c.AttachedObject.Equals(attachedObject));
+
     #endregion
 
-    public int GetPathLength(Cell cellStart, Cell cellEnd)
-    {
-        return 0;
-    }
+    public int GetPathLength(Cell cellStart, Cell cellEnd) 
+        => Mathf.Abs(cellStart.Position.x - cellEnd.Position.x) +
+        Mathf.Abs(cellStart.Position.y - cellEnd.Position.y);
 
     public int GetPathLength(Vector2Int positionCellStart, Vector2Int positionCellEnd)
-    {
-        return 0;
-    }
+        => Mathf.Abs(positionCellStart.x - positionCellEnd.x) +
+        Mathf.Abs(positionCellStart.y - positionCellEnd.y);
 
     public void DestroyAllCells()
     {

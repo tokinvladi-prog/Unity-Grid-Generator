@@ -17,6 +17,11 @@ public class GridBuilderWindow : EditorWindow
     private GameObject _draggedPrefab;
     private GameObject _currentObject;
 
+    private const string GEOMETRY_GAMEOBJECT_NAME = "Geometry";
+    private const string ENVIRONMENT_GAMEOBJECT_NAME = "Environment";
+    private const string RESOURCE_GAMEOBJECT_NAME = "Resource";
+    private readonly Vector3 GRID_START = Vector3.zero;
+
     #endregion
 
     [MenuItem("Tools/Open Grid Builder Window")]
@@ -61,6 +66,11 @@ public class GridBuilderWindow : EditorWindow
                     if (_currentObject.TryGetComponent<Resource>(out _))
                     {
                         CellStorage.Instance.SetCellStatus(cell, CellStatus.Resource);
+                        Filter(RESOURCE_GAMEOBJECT_NAME);
+                    }
+                    else
+                    {
+                        Filter(ENVIRONMENT_GAMEOBJECT_NAME);
                     }
                     DragAndDrop.AcceptDrag();
                 }
@@ -107,6 +117,19 @@ public class GridBuilderWindow : EditorWindow
                     }
                     Event.current.Use();
                 }
+
+                if (Event.current.keyCode == KeyCode.Delete && _currentObject != null)
+                {
+                    var attachedCell = CellStorage.Instance.GetCell(_currentObject);
+
+                    if (attachedCell != null)
+                    {
+                        CellStorage.Instance.SetCellStatus(attachedCell, CellStatus.Empty);
+                        attachedCell.AttachedObject = null;
+                    }
+                    DestroyImmediate(_currentObject);
+                    _currentObject = null;
+                }
                 break;
 
             case EventType.MouseDrag:
@@ -150,7 +173,6 @@ public class GridBuilderWindow : EditorWindow
                             }
                         }
                     }
-                    _currentObject = null;
 
                     SceneView.RepaintAll();
                     Event.current.Use();
@@ -176,6 +198,38 @@ public class GridBuilderWindow : EditorWindow
                 cellCoordinate.y * CellStorage.Instance.CellSize + CellStorage.Instance.CellSize / 2f);
             _lastPosition = cellCoordinate;
         }
+    }
+
+    private void Filter(string status)
+    {
+        var geometry = GetContainer(GEOMETRY_GAMEOBJECT_NAME);
+
+        switch (status)
+        {
+            case RESOURCE_GAMEOBJECT_NAME:
+                var resource = GetContainer(RESOURCE_GAMEOBJECT_NAME);
+                resource.SetParent(geometry);
+                _currentObject.transform.SetParent(resource);
+                break;
+            case ENVIRONMENT_GAMEOBJECT_NAME:
+                var environment = GetContainer(ENVIRONMENT_GAMEOBJECT_NAME);
+                environment.SetParent(geometry);
+                _currentObject.transform.SetParent(environment);
+                break;
+        }
+    }
+
+    private Transform GetContainer(string status)
+    {
+        var container = GameObject.Find(status);
+
+        if (container == null)
+        {
+            container = new GameObject(status);
+            container.transform.position = GRID_START;
+        }
+
+        return container.transform;
     }
 
     private Vector2Int WorldToGridCoordinate(Vector3 worldPosition)
