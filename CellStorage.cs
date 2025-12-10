@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 [ExecuteAlways]
 public class CellStorage : MonoBehaviour
 {
+    #region Fields
+
     [field: SerializeField] public Vector2Int GridSize { get; set; }
     [field: SerializeField] public float CellSize { get; set; }
     [field: SerializeField] public Vector3 GridStart { get; set; }
@@ -12,27 +15,16 @@ public class CellStorage : MonoBehaviour
 
     public static CellStorage Instance { get; private set; }
 
-    public CellStatus GetCellStatus(Vector2Int position)
-        => Cells.FirstOrDefault(c => c.Position.Equals(position)).Status;
+    #endregion
+
+    #region Get/Set Cell Logic
 
     public void SetCellStatus(Vector2Int position, CellStatus status)
     {
         var cell = Cells.FirstOrDefault(c => c.Position.Equals(position));
-        if (cell != null)
-        {
-            cell.Status = status;
-        }
-    }
+        if (cell == null) return;
 
-    private void OnEnable()
-    {
-        Instance = this;
-    }
-
-    private void OnDisable()
-    {
-        if (Instance == this)
-            Instance = null;
+        cell.Status = status;
     }
 
     public void SetCellStatus(Cell cell, CellStatus status)
@@ -42,34 +34,42 @@ public class CellStorage : MonoBehaviour
         cell.Status = status;
     }
 
-    public Cell GetCell(Cell cell)
-    {
-        return null;
-    }
-    public Cell GetCell(Vector2Int position)
-    {
-        return null;
-    }
+    public CellStatus GetCellStatus(Vector2Int position)
+        => Cells.FirstOrDefault(c => c.Position.Equals(position)).Status;
 
+    public CellStatus GetCellStatus(Cell cell)
+        => Cells.FirstOrDefault(c => c.Equals(cell)).Status;
+
+    public Cell GetCell(Cell cell)
+        => Cells.FirstOrDefault(c => c.Equals(cell));
+
+    public Cell GetCell(Vector2Int position)
+        => Cells.FirstOrDefault(c => c.Position.Equals(position));
+
+    #endregion
 
     public int GetPathLength(Cell cellStart, Cell cellEnd)
     {
         return 0;
     }
 
-    public int GetPathLenght(Vector2Int positionCellStart, Vector2Int positionCellEnd)
+    public int GetPathLength(Vector2Int positionCellStart, Vector2Int positionCellEnd)
     {
         return 0;
     }
 
     public void DestroyAllCells()
     {
-
+        Cells.ForEach(c => DestroyImmediate(c.gameObject));
+        Cells.Clear();
     }
 
-    public void DestroyCell()
-    {
+    private void OnEnable() => Instance = this;
 
+    private void OnDisable()
+    {
+        if (Instance == this)
+            Instance = null;
     }
 
 #if UNITY_EDITOR

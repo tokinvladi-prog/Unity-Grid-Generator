@@ -46,7 +46,7 @@ public class GridGeneratorWindow : EditorWindow
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("Generate Grid", GUILayout.Width(100))) GenerateGrid();
-        if (GUILayout.Button("Destroy Grid", GUILayout.Width(100))) ClearGrid(_container);
+        if (GUILayout.Button("Destroy Grid", GUILayout.Width(100))) CellStorage.Instance.DestroyAllCells();
         GUILayout.EndHorizontal();
     }
 
@@ -60,7 +60,7 @@ public class GridGeneratorWindow : EditorWindow
 
     private void GenerateGrid()
     {
-        ClearGrid(_container);
+        CellStorage.Instance.DestroyAllCells();
 
         for (int x = 0; x < _gridSize.x; x++)
             for (int y = 0; y < _gridSize.y; y++)
@@ -101,12 +101,6 @@ public class GridGeneratorWindow : EditorWindow
 
             CellStorage.Instance.Cells.Add(cell);
         }
-    }
-
-    private void ClearGrid(Transform container)
-    {
-        container.Cast<Transform>().ToList().ForEach(c => DestroyImmediate(c.gameObject));
-        CellStorage.Instance.Cells.Clear();
     }
 
     #endregion

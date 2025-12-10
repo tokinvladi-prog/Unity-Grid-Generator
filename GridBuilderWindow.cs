@@ -31,44 +31,8 @@ public class GridBuilderWindow : EditorWindow
 
     private void OnGUI()
     {
-        GUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField("Folder Path:", GUILayout.Width(80));
-        _folderPath = EditorGUILayout.TextField(_folderPath);
-
-        if (GUILayout.Button("Browse", GUILayout.Width(80)))
-        {
-            string path = EditorUtility.OpenFolderPanel("Select Folder", "Assets", "");
-            if (!string.IsNullOrEmpty(path))
-            {
-                _folderPath = "Assets" + path[Application.dataPath.Length..];
-            }
-        }
-
-        if (GUILayout.Button("Refresh", GUILayout.Width(80)))
-        {
-            LoadPrefabs();
-        }
-        GUILayout.EndHorizontal();
-
-        _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
-
-        int columns = Mathf.Max(1, Mathf.FloorToInt(position.width / _gridSize));
-        int rows = Mathf.CeilToInt(_prefabs.Count / (float)columns);
-
-        for (int row = 0; row < rows; row++)
-        {
-            GUILayout.BeginHorizontal();
-            for (int col = 0; col < columns; col++)
-            {
-                int index = row * columns + col;
-                if (index >= _prefabs.Count) break;
-
-                DrawPrefabItem(_prefabs[index]);
-            }
-            GUILayout.EndHorizontal();
-        }
-
-        GUILayout.EndScrollView();
+        DrawControls();
+        DrawPrefabs();
     }
 
     private void OnSceneGUI(SceneView sceneView)
@@ -89,11 +53,21 @@ public class GridBuilderWindow : EditorWindow
                 break;
 
             case EventType.DragPerform:
-                if (_currentObject.TryGetComponent<Resource>(out var resource))
+                var cell = CellStorage.Instance.GetCell(_lastPosition);
+                if (cell != null && cell.AttachedObject == null)
                 {
-                    CellStorage.Instance.SetCellStatus(_lastPosition, CellStatus.Resource);
+                    cell.AttachedObject = _currentObject;
+
+                    if (_currentObject.TryGetComponent<Resource>(out _))
+                    {
+                        CellStorage.Instance.SetCellStatus(cell, CellStatus.Resource);
+                    }
+                    DragAndDrop.AcceptDrag();
                 }
-                DragAndDrop.AcceptDrag();
+                else
+                {
+                    DestroyImmediate(_currentObject);
+                }
                 _currentObject = null;
 
                 SceneView.RepaintAll();
@@ -110,6 +84,12 @@ public class GridBuilderWindow : EditorWindow
                         _currentObject = clickedObject;
                         Selection.activeGameObject = _currentObject;
                         _previousCellPosition = WorldToGridCoordinate(_currentObject.transform.position);
+
+                        Cell previousCell = CellStorage.Instance.GetCell(_previousCellPosition);
+                        if (previousCell != null && previousCell.AttachedObject == _currentObject)
+                        {
+                            previousCell.AttachedObject = null;
+                        }
 
                         Event.current.Use();
                     }
@@ -141,18 +121,41 @@ public class GridBuilderWindow : EditorWindow
                 if (_currentObject != null && Event.current.button == 0)
                 {
                     CellStorage.Instance.SetCellStatus(_previousCellPosition, CellStatus.Empty);
+                    Cell targetCell = CellStorage.Instance.GetCell(_lastPosition);
 
-                    if (_currentObject.TryGetComponent<Resource>(out var res))
+                    if (targetCell != null && targetCell.AttachedObject == null)
                     {
-                        CellStorage.Instance.SetCellStatus(_lastPosition, CellStatus.Resource);
-                    }
+                        targetCell.AttachedObject = _currentObject;
 
+                        if (_currentObject.TryGetComponent<Resource>(out _))
+                        {
+                            CellStorage.Instance.SetCellStatus(_lastPosition, CellStatus.Resource);
+                        }
+                    }
+                    else if (targetCell != null && targetCell.AttachedObject != null)
+                    {
+                        _currentObject.transform.position = new Vector3(
+                            _previousCellPosition.x * CellStorage.Instance.CellSize + CellStorage.Instance.CellSize / 2f,
+                            CellStorage.Instance.GridStart.y,
+                            _previousCellPosition.y * CellStorage.Instance.CellSize + CellStorage.Instance.CellSize / 2f);
+
+                        Cell previousCell = CellStorage.Instance.GetCell(_previousCellPosition);
+                        if (previousCell != null)
+                        {
+                            previousCell.AttachedObject = _currentObject;
+
+                            if (_currentObject.TryGetComponent<Resource>(out _))
+                            {
+                                CellStorage.Instance.SetCellStatus(_previousCellPosition, CellStatus.Resource);
+                            }
+                        }
+                    }
                     _currentObject = null;
+
                     SceneView.RepaintAll();
                     Event.current.Use();
                 }
                 break;
-
         }
     }
 
@@ -187,6 +190,51 @@ public class GridBuilderWindow : EditorWindow
     }
 
     #region GUI Prefabs Logic
+
+    private void DrawControls()
+    {
+        GUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Folder Path:", GUILayout.Width(80));
+        _folderPath = EditorGUILayout.TextField(_folderPath);
+
+        if (GUILayout.Button("Browse", GUILayout.Width(80)))
+        {
+            string path = EditorUtility.OpenFolderPanel("Select Folder", "Assets", "");
+            if (!string.IsNullOrEmpty(path))
+            {
+                _folderPath = "Assets" + path[Application.dataPath.Length..];
+            }
+        }
+
+        if (GUILayout.Button("Refresh", GUILayout.Width(80)))
+        {
+            LoadPrefabs();
+        }
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawPrefabs()
+    {
+        _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
+
+        int columns = Mathf.Max(1, Mathf.FloorToInt(position.width / _gridSize));
+        int rows = Mathf.CeilToInt(_prefabs.Count / (float)columns);
+
+        for (int row = 0; row < rows; row++)
+        {
+            GUILayout.BeginHorizontal();
+            for (int col = 0; col < columns; col++)
+            {
+                int index = row * columns + col;
+                if (index >= _prefabs.Count) break;
+
+                DrawPrefabItem(_prefabs[index]);
+            }
+            GUILayout.EndHorizontal();
+        }
+
+        GUILayout.EndScrollView();
+    }
 
     private void LoadPrefabs()
     {
